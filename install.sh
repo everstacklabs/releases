@@ -37,7 +37,7 @@ if [[ -z "$VERSION" || "$VERSION" == "latest" ]]; then
   echo "Fetching latest version..."
   VERSION=$(
     curl -fsSL "https://api.github.com/repos/${RELEASES_REPO}/releases/latest" \
-      | sed -n 's/.*"tag_name"\s*:\s*"\([^"]*\)".*/\1/p'
+      | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
   )
   if [[ -z "$VERSION" || "$VERSION" == "null" ]]; then
     echo "error: could not fetch latest version from GitHub" >&2
@@ -103,7 +103,13 @@ fi
 gunzip -c "${tmpdir}/${ARCHIVE}" > "${tmpdir}/evs"
 chmod +x "${tmpdir}/evs"
 
-# Use sudo if the target dir is not writable
+# Create the target dir as the current user first. A not-yet-existing but
+# creatable dir (e.g. ~/.local/bin) would otherwise fail the -w test below
+# and needlessly escalate to sudo.
+mkdir -p "$BIN_DIR" 2>/dev/null || true
+
+# Fall back to sudo only if the dir still isn't writable (e.g. the default
+# /usr/local/bin, which is root-owned on macOS).
 SUDO=""
 if [[ ! -w "$BIN_DIR" ]]; then
   if command -v sudo >/dev/null 2>&1; then
@@ -117,7 +123,7 @@ if [[ ! -w "$BIN_DIR" ]]; then
   fi
 fi
 
-mkdir -p "$BIN_DIR"
+$SUDO mkdir -p "$BIN_DIR"
 $SUDO install -m 0755 "${tmpdir}/evs" "${BIN_DIR}/evs"
 
 # Keep 'everstack' as a backward-compatible alias
